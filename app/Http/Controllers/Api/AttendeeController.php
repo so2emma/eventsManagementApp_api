@@ -4,18 +4,28 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\AttendeeResource;
+use App\Http\Traits\CanLoadRelationships;
 use App\Models\Attendee;
 use App\Models\Event;
 use Illuminate\Http\Request;
 
 class AttendeeController extends Controller
 {
+    use CanLoadRelationships;
+    protected $relations = ['user'];
+
+    public function __construct()
+    {
+        $this->middleware('auth:sanctum')->except(['index', 'show', 'update']);
+    }
     /**
      * Display a listing of the resource.
      */
     public function index(Event $event)
     {
-        $attendees = $event->attendees()->latest();
+        $attendees = $this->loadRelationships(
+            $event->attendees()->latest()
+        );
         return AttendeeResource::collection(
             $attendees->paginate()
         );
@@ -24,11 +34,13 @@ class AttendeeController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request, Event $event)
+    public function store(Event $event)
     {
-        $attendee = $event->attendees()->create([
+        $attendee = $this->loadRelationships(
+            $event->attendees()->create([
             'user_id' => 1
-        ]);
+        ])
+    );
 
         return new AttendeeResource($attendee);
     }
@@ -38,22 +50,15 @@ class AttendeeController extends Controller
      */
     public function show(Event $event, Attendee $attendee)
     {
-        return new AttendeeResource($attendee);
-    }
-
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, string $id)
-    {
-        //
+        return new AttendeeResource($this->loadRelationships($attendee));
     }
 
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(string $event, Attendee $attendee)
+    public function destroy(Event $event, Attendee $attendee)
     {
+        $this->authorize('delete-attendee', [$attendee, $event]);
         return response(status: 204);
     }
 }
